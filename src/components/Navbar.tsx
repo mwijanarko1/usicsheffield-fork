@@ -81,6 +81,9 @@ export default function Navbar() {
             <Link href="/events" className="text-white hover:text-blue-200 transition duration-300">
               Events
             </Link>
+            <Link href="/newsletters" className="text-white hover:text-blue-200 transition duration-300">
+              Newsletters
+            </Link>
             
             {/* Membership Dropdown */}
             <div className="relative" ref={membershipDropdownRef}>
@@ -187,6 +190,13 @@ export default function Navbar() {
               onClick={() => setIsMenuOpen(false)}
             >
               Events
+            </Link>
+            <Link
+              href="/newsletters"
+              className="block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-[#234b64] hover:text-white"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Newsletters
             </Link>
             {/* Membership Section - Mobile */}
             <div className="px-3 py-2">

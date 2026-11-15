@@ -105,9 +105,9 @@ export default function PricingPage() {
                   <CTAButton
                     href={
                       tier.name === '1 Year'
-                        ? 'https://su.sheffield.ac.uk/shop/product/29923-'
+                        ? 'https://su.sheffield.ac.uk/shop/product/37777-'
                         : tier.name === 'Lifetime'
-                        ? 'https://su.sheffield.ac.uk/shop/product/29924-'
+                        ? 'https://su.sheffield.ac.uk/shop/product/37779-'
                         : '/membership'
                     }
                     external={tier.name === '1 Year' || tier.name === 'Lifetime'}
