@@ -73,7 +73,7 @@ const securityHeaders = {
     "img-src 'self' data: https: blob:",
     "media-src 'self' https: blob:",
     "connect-src 'self' https://firebase.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebaseinstallations.googleapis.com https://accounts.google.com https://oauth2.googleapis.com wss://firestore.googleapis.com wss://*.googleapis.com",
-    "frame-src https://accounts.google.com https://*.firebaseapp.com",
+    "frame-src 'self' https://accounts.google.com https://*.firebaseapp.com https://res.cloudinary.com",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self' https://accounts.google.com",

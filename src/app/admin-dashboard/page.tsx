@@ -92,6 +92,21 @@ interface EventFormData {
   signupFormUrl?: string;
 }
 
+interface Newsletter {
+  id: string;
+  title: string;
+  academicYear: string;
+  weekNumber: number;
+  publicationDate: string;
+  description?: string;
+  pdfUrl: string;
+  pdfPublicId: string;
+  fileName: string;
+  published: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -109,11 +124,11 @@ export default function AdminDashboard() {
     totalUsers: 0
   });
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'posts' | 'events' | 'users'>(() => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'posts' | 'events' | 'users' | 'newsletters'>(() => {
     // Read the tab parameter from URL to set initial state
     const tabParam = searchParams.get('tab');
 
-    if (tabParam === 'posts' || tabParam === 'events' || tabParam === 'users') {
+    if (tabParam === 'posts' || tabParam === 'events' || tabParam === 'users' || tabParam === 'newsletters') {
       return tabParam;
     }
 
@@ -135,6 +150,23 @@ export default function AdminDashboard() {
   
   // Events state
   const [events, setEvents] = useState<Event[]>([]);
+
+  // Newsletters state
+  const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
+  const [isLoadingNewsletters, setIsLoadingNewsletters] = useState(false);
+  const [isUploadingNewsletter, setIsUploadingNewsletter] = useState(false);
+  const [newsletterError, setNewsletterError] = useState('');
+  const [newsletterSuccess, setNewsletterSuccess] = useState('');
+
+  const [newsletterFormData, setNewsletterFormData] = useState({
+    title: '',
+    academicYear: '2026/27',
+    weekNumber: '',
+    publicationDate: '',
+    description: '',
+  });
+
+const [newsletterPdf, setNewsletterPdf] = useState<File | null>(null);
 
   // Users management state
   const [usersSearchTerm, setUsersSearchTerm] = useState('');
@@ -275,11 +307,22 @@ export default function AdminDashboard() {
     }
   }, [activeTab, isAuthenticated, isAdmin, events.length]);
 
+  // Load newsletters when Newsletters tab is selected
+  useEffect(() => {
+    if (activeTab === 'newsletters' && isAuthenticated && isAdmin) {
+      loadNewsletters();
+    }
+  }, [activeTab, isAuthenticated, isAdmin]);
+
   // Update activeTab when URL search params change
   useEffect(() => {
     const tabParam = searchParams.get('tab');
 
-    if (tabParam === 'posts' || tabParam === 'events') {
+    if (
+      tabParam === 'posts' ||
+      tabParam === 'events' ||
+      tabParam === 'newsletters'
+    ) {
       setActiveTab(tabParam);
     } else if (tabParam === 'overview' || !tabParam) {
       setActiveTab('overview');
@@ -370,6 +413,198 @@ export default function AdminDashboard() {
       console.error('[AdminDashboard] Failed to load events:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadNewsletters = async () => {
+    try {
+      setIsLoadingNewsletters(true);
+      setNewsletterError('');
+
+      const token = await getIdToken();
+
+      if (!token) {
+        throw new Error('Failed to get authentication token');
+      }
+
+      const response = await fetch('/api/admin/newsletters', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch newsletters');
+      }
+
+      const data = await response.json();
+      setNewsletters(data.newsletters || []);
+    } catch (error) {
+      console.error('[AdminDashboard] Failed to load newsletters:', error);
+      setNewsletterError(
+        error instanceof Error ? error.message : 'Failed to load newsletters'
+      );
+    } finally {
+      setIsLoadingNewsletters(false);
+    }
+  };
+
+
+const handleNewsletterPublish = async (
+  newsletterId: string,
+  published: boolean
+) => {
+  try {
+    setNewsletterError('');
+    setNewsletterSuccess('');
+
+    const token = await getIdToken();
+
+    if (!token) {
+      throw new Error('Failed to get authentication token');
+    }
+
+    const response = await fetch(
+      `/api/admin/newsletters/${newsletterId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ published }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to update newsletter');
+    }
+
+    setNewsletterSuccess(
+      published ? 'Newsletter published successfully!' : 'Newsletter unpublished successfully!'
+    );
+
+    await loadNewsletters();
+  } catch (error) {
+    console.error('Newsletter publish error:', error);
+    setNewsletterError(
+      error instanceof Error ? error.message : 'Failed to update newsletter'
+    );
+  }
+};
+
+const handleNewsletterDelete = async (newsletterId: string) => {
+  if (!window.confirm(
+    'Are you sure you want to permanently delete this newsletter and its PDF?'
+  )) {
+    return;
+  }
+
+  try {
+    setNewsletterError('');
+    setNewsletterSuccess('');
+
+    const token = await getIdToken();
+
+    if (!token) {
+      throw new Error('Failed to get authentication token');
+    }
+
+    const response = await fetch(
+      `/api/admin/newsletters/${newsletterId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to delete newsletter');
+    }
+
+    setNewsletterSuccess('Newsletter deleted successfully!');
+
+    await loadNewsletters();
+    } catch (error) {
+      console.error('Newsletter deletion error:', error);
+      setNewsletterError(
+        error instanceof Error ? error.message : 'Failed to delete newsletter'
+      );
+    }
+  };
+
+
+  const handleNewsletterUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!newsletterPdf) {
+      setNewsletterError('Please select a PDF file.');
+      return;
+    }
+
+    try {
+      setIsUploadingNewsletter(true);
+      setNewsletterError('');
+      setNewsletterSuccess('');
+
+      const token = await getIdToken();
+
+      if (!token) {
+        throw new Error('Failed to get authentication token');
+      }
+
+      const formData = new FormData();
+
+      formData.append('title', newsletterFormData.title);
+      formData.append('academicYear', newsletterFormData.academicYear);
+      formData.append('weekNumber', newsletterFormData.weekNumber);
+      formData.append('publicationDate', newsletterFormData.publicationDate);
+      formData.append('description', newsletterFormData.description);
+      formData.append('pdf', newsletterPdf);
+
+      const response = await fetch('/api/admin/newsletters', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upload newsletter');
+      }
+
+      setNewsletterSuccess('Newsletter uploaded successfully. It is currently saved as a draft.');
+
+      setNewsletterFormData({
+        title: '',
+        academicYear: '2026/27',
+        weekNumber: '',
+        publicationDate: '',
+        description: '',
+      });
+
+      setNewsletterPdf(null);
+
+      await loadNewsletters();
+
+    } catch (error) {
+      console.error('[AdminDashboard] Newsletter upload failed:', error);
+      setNewsletterError(
+        error instanceof Error ? error.message : 'Failed to upload newsletter'
+      );
+    } finally {
+      setIsUploadingNewsletter(false);
     }
   };
 
@@ -1236,6 +1471,16 @@ export default function AdminDashboard() {
             >
               Manage Users
             </button>
+            <button
+              onClick={() => setActiveTab('newsletters')}
+              className={`py-2 px-4 border-b-2 transition-colors ${
+                activeTab === 'newsletters'
+                  ? 'border-blue-500 text-white'
+                  : 'border-transparent text-gray-300 hover:text-white'
+              }`}
+            >
+              Newsletters
+            </button>
           </div>
         </div>
       </nav>
@@ -1869,6 +2114,240 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
+
+        {activeTab === 'newsletters' && (
+  <div className="space-y-6">
+
+    {/* Newsletter Management Header */}
+    <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-xl p-6">
+      <h2 className="text-white text-2xl font-bold mb-2">
+        Newsletter Archive
+      </h2>
+      <p className="text-gray-300 text-sm">
+        Upload, publish and manage weekly USIC newsletters.
+      </p>
+    </div>
+
+    {/* Upload Form */}
+    <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+      <h3 className="text-white text-xl font-semibold mb-5">
+        Upload a Newsletter
+      </h3>
+
+      <form onSubmit={handleNewsletterUpload} className="space-y-4">
+
+        <div>
+          <label className="block text-gray-300 text-sm mb-2">
+            Newsletter Title *
+          </label>
+          <input
+            type="text"
+            required
+            value={newsletterFormData.title}
+            onChange={(e) => setNewsletterFormData({
+              ...newsletterFormData,
+              title: e.target.value
+            })}
+            placeholder="e.g. The USIC Weekly"
+            className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-gray-300 text-sm mb-2">
+              Academic Year *
+            </label>
+            <input
+              type="text"
+              required
+              pattern="\d{4}/\d{2}"
+              value={newsletterFormData.academicYear}
+              onChange={(e) => setNewsletterFormData({
+                ...newsletterFormData,
+                academicYear: e.target.value
+              })}
+              placeholder="2026/27"
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-300 text-sm mb-2">
+              Week Number *
+            </label>
+            <input
+              type="number"
+              required
+              min="1"
+              max="52"
+              value={newsletterFormData.weekNumber}
+              onChange={(e) => setNewsletterFormData({
+                ...newsletterFormData,
+                weekNumber: e.target.value
+              })}
+              placeholder="1"
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-300 text-sm mb-2">
+              Publication Date *
+            </label>
+            <input
+              type="date"
+              required
+              value={newsletterFormData.publicationDate}
+              onChange={(e) => setNewsletterFormData({
+                ...newsletterFormData,
+                publicationDate: e.target.value
+              })}
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-gray-300 text-sm mb-2">
+            Description (Optional)
+          </label>
+          <textarea
+            rows={3}
+            value={newsletterFormData.description}
+            onChange={(e) => setNewsletterFormData({
+              ...newsletterFormData,
+              description: e.target.value
+            })}
+            placeholder="A short description of this week's newsletter..."
+            className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400"
+          />
+        </div>
+
+        <div>
+          <label className="block text-gray-300 text-sm mb-2">
+            Newsletter PDF *
+          </label>
+          <input
+            type="file"
+            accept="application/pdf,.pdf"
+            required
+            onChange={(e) => setNewsletterPdf(e.target.files?.[0] || null)}
+            className="w-full text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+          />
+          <p className="text-gray-400 text-xs mt-2">
+            PDF only. Maximum file size: 4 MB.
+          </p>
+          {newsletterPdf && (
+            <p className="text-green-400 text-sm mt-2">
+              Selected: {newsletterPdf.name}
+            </p>
+          )}
+        </div>
+
+        {newsletterError && (
+          <p className="text-red-400 text-sm">{newsletterError}</p>
+        )}
+
+        {newsletterSuccess && (
+          <p className="text-green-400 text-sm">{newsletterSuccess}</p>
+        )}
+
+        <button
+          type="submit"
+          disabled={isUploadingNewsletter}
+          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold px-6 py-3 rounded-lg transition-colors"
+        >
+          {isUploadingNewsletter ? 'Uploading...' : 'Upload Newsletter'}
+        </button>
+
+      </form>
+    </div>
+
+    {/* Uploaded Newsletters */}
+    <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+      <div className="flex items-center justify-between mb-5">
+        <h3 className="text-white text-xl font-semibold">
+          Uploaded Newsletters
+        </h3>
+        <button
+          onClick={loadNewsletters}
+          disabled={isLoadingNewsletters}
+          className="text-blue-400 hover:text-blue-300 text-sm disabled:opacity-50"
+        >
+          {isLoadingNewsletters ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
+      {isLoadingNewsletters ? (
+        <p className="text-gray-400">Loading newsletters...</p>
+      ) : newsletters.length === 0 ? (
+        <p className="text-gray-400">
+          No newsletters uploaded yet.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {newsletters.map((newsletter) => (
+            <div
+              key={newsletter.id}
+              className="bg-white/5 border border-white/10 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+            >
+              <div>
+                <h4 className="text-white font-semibold">
+                  {newsletter.title}
+                </h4>
+                <p className="text-gray-400 text-sm mt-1">
+                  {newsletter.academicYear} · Week {newsletter.weekNumber} · {newsletter.publicationDate}
+                </p>
+                {newsletter.description && (
+                  <p className="text-gray-400 text-sm mt-1">
+                    {newsletter.description}
+                  </p>
+                )}
+                <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold ${
+                  newsletter.published
+                    ? 'bg-green-500/20 text-green-300'
+                    : 'bg-yellow-500/20 text-yellow-300'
+                }`}>
+                  {newsletter.published ? 'PUBLISHED' : 'DRAFT'}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href={newsletter.pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-lg bg-white/10 text-white text-sm hover:bg-white/20"
+                >
+                  View PDF
+                </a>
+
+                <button
+                  onClick={() => handleNewsletterPublish(
+                    newsletter.id,
+                    !newsletter.published
+                  )}
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                >
+                  {newsletter.published ? 'Unpublish' : 'Publish'}
+                </button>
+
+                <button
+                  onClick={() => handleNewsletterDelete(newsletter.id)}
+                  className="px-4 py-2 rounded-lg bg-red-600/80 hover:bg-red-600 text-white text-sm"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+  </div>
+)}
 
         {/* Event Creation Modal */}
         {showEventForm && (

@@ -238,101 +238,39 @@ export default function EventsPage() {
     };
 
     // Helper function to calculate recurring event dates
-    const calculateRecurringDates = (dateString: string, eventTitle: string, numOccurrences: number = 3): string[] => {
-      const dates: string[] = [];
-
-      if (!dateString.includes('Every')) return dates;
-
-      const dayMap = new Map([
-        ['Monday', 1], ['Tuesday', 2], ['Wednesday', 3], ['Thursday', 4],
-        ['Friday', 5], ['Saturday', 6], ['Sunday', 0]
-      ]);
-
-      const dayMatch = dateString.match(/Every (\w+)/);
-
-      if (!dayMatch) return dates;
-
-      const dayOfWeek = dayMap.get(dayMatch[1]);
-
-      if (dayOfWeek === undefined) return dates;
-
-      // Special handling for Roots Academy Classes - use specific dates
-      if (eventTitle === 'Roots Academy Classes') {
-        const specificRootsDates = [
-          '2025-10-07', '2025-10-14', '2025-10-21', '2025-10-28',
-          '2025-11-04', '2025-11-11', '2025-11-18', '2025-11-25',
-          '2025-12-02', '2025-12-09', '2025-12-16',
-          '2026-03-24', '2026-03-31', '2026-04-07', '2026-04-14', '2026-04-21', '2026-04-28',
-          '2026-05-05', '2026-05-12', '2026-05-19'
-        ];
-
-        // Filter to only include future dates
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        return specificRootsDates.filter(dateStr => {
-          const eventDate = new Date(dateStr);
-
-          return eventDate >= today;
-        });
-      }
-
-      // Special handling for Friday Football - use specific dates
-      if (eventTitle === 'Friday Football') {
-        const specificFridayFootballDates = [
-          '2025-09-26', '2025-10-03', '2025-10-10', '2025-10-17', '2025-10-24', '2025-10-31',
-          '2025-11-07', '2025-11-14', '2025-11-21', '2025-11-28',
-          '2025-12-05', '2025-12-12', '2025-12-19'
-        ];
-
-        // Filter to only include future dates
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        return specificFridayFootballDates.filter(dateStr => {
-          const eventDate = new Date(dateStr);
-
-          return eventDate >= today;
-        });
-      }
-
-      // Fallback to original logic for events without specific ranges
-      const startDate = new Date();
-
-      // Find the next occurrence of the specified day (more reliable method)
-      const firstOccurrence = new Date(startDate);
-      const startDay = startDate.getDay();
-      let daysToAdd = 0;
-
-      if (startDay <= dayOfWeek) {
-        // If start day is before or equal to target day, add the difference
-        daysToAdd = dayOfWeek - startDay;
-      } else {
-        // If start day is after target day, add days to reach next occurrence
-        daysToAdd = (7 - startDay) + dayOfWeek;
-      }
-
-      // If we're already on the target day and it's not today, or if daysToAdd is 0, add 7 days
-      if (daysToAdd === 0) {
-        daysToAdd = 7;
-      }
-
-      firstOccurrence.setDate(startDate.getDate() + daysToAdd);
-
-      // Generate the specified number of occurrences
-      for (let i = 0; i < numOccurrences; i++) {
-        const occurrenceDate = new Date(firstOccurrence);
-        occurrenceDate.setDate(firstOccurrence.getDate() + (i * 7)); // Add 7 days for each occurrence
-
-        // Only include dates that are today or in the future
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        if (occurrenceDate >= today) {
-          dates.push(occurrenceDate.toISOString().split('T')[0]);
-        }
-      }
-
+    const calculateRecurringDates = (
+      dateString: string,
+      eventTitle: string,
+      numOccurrences: number = 12
+    ): string[] => {
+    const dates: string[] = [];
+    if (!dateString.includes('Every')) return dates;
+    const dayMap = new Map([
+      ['Monday', 1],
+      ['Tuesday', 2],
+      ['Wednesday', 3],
+      ['Thursday', 4],
+      ['Friday', 5],
+      ['Saturday', 6],
+      ['Sunday', 0]
+    ]);
+    const dayMatch = dateString.match(/Every (\w+)/);
+    if (!dayMatch) return dates;
+    const dayOfWeek = dayMap.get(dayMatch[1]);
+    if (dayOfWeek === undefined) return dates;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const firstOccurrence = new Date(today);
+    const daysToAdd = (dayOfWeek - today.getDay() + 7) % 7;
+    firstOccurrence.setDate(today.getDate() + daysToAdd);
+    for (let i = 0; i < numOccurrences; i++) {
+      const occurrenceDate = new Date(firstOccurrence);
+      occurrenceDate.setDate(firstOccurrence.getDate() + (i * 7));
+      const year = occurrenceDate.getFullYear();
+      const month = String(occurrenceDate.getMonth() + 1).padStart(2, '0');
+      const day = String(occurrenceDate.getDate()).padStart(2, '0');
+      dates.push(`${year}-${month}-${day}`);
+    }
       return dates;
     };
 
@@ -447,7 +385,8 @@ export default function EventsPage() {
         })
       }));
 
-    return sortedDates;
+    // Only show today and future dates on the timeline
+    return sortedDates.filter(dateItem => dateItem.dateKey >= todayKey);
   };
 
   // Events data from events.txt
@@ -457,8 +396,8 @@ export default function EventsPage() {
       id: 1,
       title: "Roots Academy Classes",
       date: "Every Tuesday",
-      time: "7:00 PM - 8:30 PM",
-      location: "Lecture Theatre 4, Arts Tower",
+      time: "6:00 PM - 7:30 PM",
+      location: "Lecture Theatre 3, The Diamond",
       category: "Other",
       description: "Our Tuesday evening classes cover different themes each semester, such as Qur'anic Tafsir/exegesis, Prophetic Seerah/biography, and methods of spiritual purification.",
       image: "https://res.cloudinary.com/derjeh0m2/image/upload/v1758524413/roots_lwb9gb.png",
@@ -469,7 +408,7 @@ export default function EventsPage() {
       id: 22,
       title: "Friday Football",
       date: "Every Friday",
-      time: "7:00 PM",
+      time: "8:00 PM",
       location: "The Wave Pitches",
       category: "Other",
       description: "Brothers' special football sessions. A great way to end the week with physical activity and brotherhood. 14 spots open each week - don't miss out!",
@@ -564,11 +503,48 @@ export default function EventsPage() {
   // Combine static events and admin events for display
   const combinedEvents = [...filteredStaticEvents, ...filteredAdminEvents];
 
-  // Filter combined events for cards display - only show public events
-  const filteredEvents = combinedEvents.filter(event =>
-    // Static events are always considered public
-    !isAdminEvent(event) || event.isPublic !== false
-  );
+  // Get a comparable YYYY-MM-DD key for event dates
+  const getEventDateKey = (dateString: string): string | null => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString;
+    }
+
+    const ordinalMatch = dateString.match(
+      /^(\w+)\s+(\d+)(?:st|nd|rd|th),\s+(\d{4})$/
+    );
+
+    if (ordinalMatch) {
+      const [, monthName, day, year] = ordinalMatch;
+      const months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+
+      const month = months.findIndex(
+        name => name.toLowerCase() === monthName.toLowerCase()
+      );
+
+      if (month !== -1) {
+        return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      }
+    }
+
+    return null;
+  };
+
+  // Only show public events that haven't already happened.
+  // Recurring events remain visible.
+  const filteredEvents = combinedEvents.filter(event => {
+    const isPublic = !isAdminEvent(event) || event.isPublic !== false;
+
+    if (!isPublic) return false;
+    if (event.date.startsWith('Every ')) return true;
+
+    const dateKey = getEventDateKey(event.date);
+
+    // Keep unrecognised date formats rather than accidentally hiding events.
+    return !dateKey || dateKey >= todayKey;
+  });
 
   // Modal handlers
   const openModal = (event: StaticEvent | AdminEvent) => {
@@ -607,7 +583,7 @@ export default function EventsPage() {
             Sign up for our events and activities using the links below
           </p>
         </div>
-        
+
         {/* Full-width Date-based Events Timeline */}
         <div className="mt-4 sm:mt-8 w-full relative">
           {/* Horizontal timeline line - spans full width */}
@@ -724,14 +700,14 @@ export default function EventsPage() {
           </div>
         </div>
       </div>
-      
+
       {/* Main content */}
       <div className="container mx-auto px-4">
         {/* Separator */}
         <div className="py-8 flex justify-center">
           <div className="w-16 h-1 bg-white/70"></div>
         </div>
-        
+
         {/* Events section */}
         <div className="pt-8">
           <h2 className="font-heading text-3xl md:text-4xl font-bold mb-4 text-center">OUR EVENTS</h2>
@@ -739,7 +715,7 @@ export default function EventsPage() {
             Discover our vibrant calendar of events that bring our community together year-round
           </p>
         </div>
-        
+
         {/* Unified Filter Buttons */}
         <div className="mb-8">
 
@@ -1064,13 +1040,13 @@ export default function EventsPage() {
             <p className="text-lg text-blue-200">No events found in this category.</p>
           </div>
         )}
-        
+
 
       </div>
 
       {/* Modal */}
       {selectedEvent && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto"
           onClick={handleModalBackdropClick}
         >
@@ -1121,7 +1097,7 @@ export default function EventsPage() {
                       <p className="text-blue-200">{formatEventDate(selectedEvent.date)}</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-start">
                     <svg className="w-5 h-5 text-blue-300 mr-3 mt-1" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"></path>
@@ -1151,7 +1127,7 @@ export default function EventsPage() {
                       )}
                     </div>
                   </div>
-                  
+
                   {('memberPrice' in selectedEvent || 'nonMemberPrice' in selectedEvent) && (selectedEvent.memberPrice || selectedEvent.nonMemberPrice) ? (
                     <div className="flex items-start">
                       <svg className="w-5 h-5 text-blue-300 mr-3 mt-1" fill="currentColor" viewBox="0 0 20 20">
@@ -1224,17 +1200,17 @@ export default function EventsPage() {
                 <div className="text-blue-100 leading-relaxed text-base whitespace-pre-wrap">{selectedEvent.description}</div>
               </div>
 
-              
+
             </div>
           </div>
         </div>
       )}
-      
+
       {/* FAQ Section for LLM Optimization */}
       <section className="py-16">
         <div className="container mx-auto px-4 text-center">
           <h2 className="font-heading text-3xl md:text-4xl font-bold mb-8 text-white">FREQUENTLY ASKED QUESTIONS</h2>
-          <button 
+          <button
             onClick={() => setShowFAQModal(true)}
             className="inline-block bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg"
           >
@@ -1242,7 +1218,7 @@ export default function EventsPage() {
           </button>
         </div>
       </section>
-      
+
       {/* FAQ Modal */}
       {showFAQModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={closeFAQModal}>
@@ -1252,7 +1228,7 @@ export default function EventsPage() {
               <div className="flex-1">
                 <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight">FREQUENTLY ASKED QUESTIONS</h2>
               </div>
-              <button 
+              <button
                 onClick={closeFAQModal}
                 className="text-white hover:text-blue-200 transition duration-200 p-2"
               >
